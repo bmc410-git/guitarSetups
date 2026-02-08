@@ -4,14 +4,13 @@
 // Keep this file out of version control or use environment-specific
 // replacements for real projects.
 
-export const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-  measurementId: 'G-MEASUREMENT_ID'
+const firebaseConfig = {
+  apiKey: "AIzaSyCnJd63tJB1L1f2VgHbhxWMXWHeidYntYY",
+  authDomain: "guitarsetupchecklist.firebaseapp.com",
+  projectId: "guitarsetupchecklist",
+  storageBucket: "guitarsetupchecklist.firebasestorage.app",
+  messagingSenderId: "1036639733374",
+  appId: "1:1036639733374:web:12ecdb301701b42f513a2f"
 };
 
 export default firebaseConfig;

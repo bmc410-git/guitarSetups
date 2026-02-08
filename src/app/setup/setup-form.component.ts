@@ -14,19 +14,7 @@ import { FirestoreService } from '../services/firestore.service';
   selector: 'app-setup-form',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, InputTextModule, InputTextareaModule, ButtonModule, CardModule, CheckboxModule, PanelModule],
-  styles: [
-    `:host ::ng-deep .p-panel { border-radius: 10px; overflow: hidden; border: 1px solid rgba(0,0,0,0.06); }
-:host ::ng-deep .p-panel .p-panel-header { background: #fafafa; font-weight: 600; padding: 0.6rem 1rem; }
-:host ::ng-deep .p-panel .p-panel-content { padding: 0.6rem 1rem; }
-.p-field, .field { display: flex; flex-direction: column; gap: 6px; }
-.p-field input[pInputText], .field input[pInputText], textarea[pInputTextarea], .p-field textarea[pInputTextarea] {
-  width: 100%; box-sizing: border-box; padding: 0.6rem; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 0.95rem;
-}
-label { font-size: 0.92rem; color: #222; }
-@media (max-width: 720px) {
-  :host ::ng-deep .p-panel { border-radius: 6px; }
-}
-`] ,
+  styleUrls: ['./setup-form.component.scss'],
   template: `
     <p-card>
       <form [formGroup]="form" (ngSubmit)="save()">
@@ -35,6 +23,21 @@ label { font-size: 0.92rem; color: #222; }
         <div class="p-field" style="width:100%">
           <label for="name">Name</label>
           <input id="name" pInputText formControlName="name" required />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="p-field">
+            <label for="manufacturer">Manufacturer</label>
+            <input id="manufacturer" pInputText formControlName="manufacturer" />
+          </div>
+          <div class="p-field">
+            <label for="model">Model</label>
+            <input id="model" pInputText formControlName="model" />
+          </div>
+          <div class="p-field">
+            <label for="color">Color / Finish</label>
+            <input id="color" pInputText formControlName="color" />
+          </div>
         </div>
 
         <div class="p-field" style="width:100%">
@@ -79,7 +82,7 @@ label { font-size: 0.92rem; color: #222; }
               </div>
             </p-panel>
 
-            <p-panel header="Initial / Completed">
+            <p-panel header="Outgoing">
               <div style="display:grid;gap:12px;padding:8px 0">
                 <div class="field">
                   <label>Fretboard Radius</label>
@@ -108,6 +111,7 @@ label { font-size: 0.92rem; color: #222; }
               </div>
             </p-panel>
           </div>
+
         </section>
 
         <section style="margin-top:12px">
@@ -124,7 +128,7 @@ label { font-size: 0.92rem; color: #222; }
               </div>
             </p-panel>
 
-            <p-panel header="Initial / Completed">
+            <p-panel header="Outgoing">
               <div style="display:grid;gap:12px;padding:8px 0">
                 <ng-container *ngFor="let s of stringNames">
                   <div class="field">
@@ -176,6 +180,9 @@ export class SetupFormComponent implements OnInit {
     // initialize the reactive form with nested groups (each measurement has received and initial values)
     this.form = this.fb.group({
       name: ['', Validators.required],
+      manufacturer: [''],
+      model: [''],
+      color: [''],
       phone: [''],
       notes: [''],
       measurements: this.fb.group({
@@ -231,20 +238,35 @@ export class SetupFormComponent implements OnInit {
       this.isEdit = true;
       this.fs.getSetup(this.id).subscribe((s) => {
         if (!s) return;
-        // patch the full form payload if present
-        if (s.form) {
-          this.form.patchValue(s.form);
+        // Support both legacy documents that stored the form under `form` and
+        // newer documents that store fields at the top level.
+        const payload = (s as any).form ? (s as any).form : s;
+        // Remove Firestore meta fields if present
+        const { id, createdAt, updatedAt, version, ...clean } = payload;
+        this.form.patchValue({
+          name: clean.name ?? s.name ?? '',
+          manufacturer: clean.manufacturer ?? '',
+          model: clean.model ?? '',
+          color: clean.color ?? '',
+          phone: clean.phone ?? (s as any).phone ?? '',
+          notes: clean.notes ?? ''
+        });
+        // patch the nested measurement & fretCondition groups if present
+        if (clean.measurements) {
+          this.form.get('measurements')?.patchValue(clean.measurements);
         }
-        // ensure top-level name/phone are patched as well
-  this.form.patchValue({ name: s.name ?? '', phone: (s as any).phone ?? '' });
+        if (clean.fretCondition) {
+          this.form.get('fretCondition')?.patchValue(clean.fretCondition);
+        }
       });
     }
   }
 
   async save() {
     const val = this.form.value;
-    // store the complete form object under `form`, keep name/phone/top-level fields
-    const payload: any = { name: val.name ?? '', phone: val.phone ?? '', form: val };
+    // Persist the form as a top-level document to match the JSON shape you provided.
+    // The form value already contains name, phone, notes, measurements, fretCondition.
+    const payload: any = { ...val };
     if (this.id) {
       await this.fs.updateSetup(this.id, payload);
     } else {
@@ -257,113 +279,185 @@ export class SetupFormComponent implements OnInit {
   printPreview() {
     const val = this.form.value;
     const html = this.buildPrintableHtml(val);
-    const w = window.open('', '_blank', 'noopener');
-    if (!w) {
-      // fallback: print current window
-      window.print();
+    // Try to open a new window/tab and write the printable HTML. Many browsers
+    // block popups — if window.open returns null, fall back to an iframe-based
+    // approach which tends to work better on mobile/Safari.
+    let w: Window | null = null;
+    try {
+      w = window.open('', '_blank');
+    } catch (e) {
+      w = null;
+    }
+
+    if (w) {
+      try {
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+      } catch (e) {
+        console.warn('Could not write to new window, falling back to iframe', e);
+      }
+
+      const doPrint = () => {
+        try {
+          w && w.focus();
+          w && w.print();
+        } catch (err) {
+          console.error('Print in popup failed', err);
+        }
+      };
+
+      // Some browsers don't reliably fire onload for programmatically written windows,
+      // so call print after a short delay as a fallback.
+      w.onload = doPrint;
+      setTimeout(doPrint, 700);
       return;
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    // Wait for resources/styles to load then call print
-    w.onload = () => {
-      try {
-        w.focus();
-        w.print();
-      } catch (e) {
-        console.error('Print failed', e);
-      }
-    };
+
+    // Popup was blocked — create a hidden iframe, write the HTML there and print.
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = (iframe.contentWindow || iframe.contentDocument) as any;
+      const idoc = doc.document || iframe.contentDocument;
+      idoc.open();
+      idoc.write(html);
+      idoc.close();
+
+      const doIframePrint = () => {
+        try {
+          (iframe.contentWindow as Window).focus();
+          (iframe.contentWindow as any).print();
+        } catch (err) {
+          console.error('Iframe print failed', err);
+          alert('Print failed. Please try using your browser\'s Print command.');
+        } finally {
+          // remove iframe after a short delay to ensure print started
+          setTimeout(() => {
+            try { document.body.removeChild(iframe); } catch (_) {}
+          }, 1000);
+        }
+      };
+
+      setTimeout(doIframePrint, 700);
+      return;
+    } catch (err) {
+      console.error('Print fallback failed', err);
+      alert('Unable to open print preview. Please use your browser\'s Print command.');
+    }
   }
 
   private buildPrintableHtml(val: any) {
-    const esc = (s: any) => (s === null || s === undefined ? '' : String(s));
-    const measurementRow = (label: string, recv: any, init: any) => `
+  const esc = (s: any) => (s === null || s === undefined ? '' : String(s));
+
+  // Table rows for measurements
+  const measurements = val.measurements || {};
+  const measurementRows = [
+    { label: 'Fretboard Radius', key: 'fretboardRadius' },
+    { label: 'High E String Gauge', key: 'highEStringGauge' },
+    { label: 'Low E String Gauge', key: 'lowEStringGauge' },
+    { label: 'Neck Relief @8th', key: 'neckRelief8th' },
+    { label: 'Low E Action @12th', key: 'lowEAction12th' },
+    { label: 'High E Action @12th', key: 'highEAction12th' }
+  ].map(m => `
+    <tr>
+      <td>${m.label}</td>
+      <td>${esc(measurements[m.key]?.received)}</td>
+      <td>${esc(measurements[m.key]?.initial)}</td>
+    </tr>
+  `).join('');
+
+  // Table rows for string heights
+  const strings = measurements.stringsAtSaddles || {};
+  const stringRows = this.stringNames.map(s => {
+    const key = this.sKey(s);
+    return `
       <tr>
-        <td style="padding:6px;border:1px solid #eee">${label}</td>
-        <td style="padding:6px;border:1px solid #eee">${esc(recv)}</td>
-        <td style="padding:6px;border:1px solid #eee">${esc(init)}</td>
-      </tr>`;
+        <td>${s}</td>
+        <td>${esc(strings[key]?.received)}</td>
+        <td>${esc(strings[key]?.initial)}</td>
+      </tr>
+    `;
+  }).join('');
 
-    const measurements = val.measurements || {};
-    const rows = [
-      measurementRow('Fretboard Radius', measurements.fretboardRadius?.received, measurements.fretboardRadius?.initial),
-      measurementRow('High E gauge', measurements.highEStringGauge?.received, measurements.highEStringGauge?.initial),
-      measurementRow('Low E gauge', measurements.lowEStringGauge?.received, measurements.lowEStringGauge?.initial),
-      measurementRow('Neck relief @8th', measurements.neckRelief8th?.received, measurements.neckRelief8th?.initial),
-      measurementRow('Low E action @12th', measurements.lowEAction12th?.received, measurements.lowEAction12th?.initial),
-      measurementRow('High E action @12th', measurements.highEAction12th?.received, measurements.highEAction12th?.initial),
-    ].join('\n');
+  // Frets affected
+  const affected = val.fretCondition?.affectedFrets || {};
+  const affectedList = Object.keys(affected)
+    .filter(k => affected[k])
+    .map(k => k.replace('fret', '').replace(/^0+/, ''))
+    .join(', ') || 'None';
 
-    const strings = measurements.stringsAtSaddles || {};
-    const stringRows = this.stringNames.map((s: string) => {
-      const key = this.sKey(s);
-      return `
-        <tr>
-          <td style="padding:6px;border:1px solid #eee">${s}</td>
-          <td style="padding:6px;border:1px solid #eee">${esc(strings[key]?.received)}</td>
-          <td style="padding:6px;border:1px solid #eee">${esc(strings[key]?.initial)}</td>
-        </tr>`;
-    }).join('\n');
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Setup Summary - ${esc(val.name)}</title>
+      <style>
+        @page { margin: 20mm; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial; color:#222; margin:0; padding:0; }
+        .container { max-width: 800px; margin: auto; padding: 12mm; }
+        h1 { font-size: 20px; margin-bottom: 8px; }
+        h2 { font-size: 16px; margin: 12px 0 6px 0; border-bottom: 1px solid #ccc; padding-bottom:2px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align:left; }
+        th { background: #f2f2f2; }
+        .section { margin-bottom: 16px; }
+        .footer { font-size: 12px; color:#555; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+  <div class="container">
+  <h1>McCoy Guitars Setup</h1>
+  <div style="margin-bottom:6px"><strong>Name:</strong> ${esc(val.name)} &nbsp;&nbsp; <strong>Phone:</strong> ${esc(val.phone)}</div>
+  <div style="margin-bottom:10px"><strong>Manufacturer:</strong> ${esc(val.manufacturer)} &nbsp;&nbsp; <strong>Model:</strong> ${esc(val.model)} &nbsp;&nbsp; <strong>Color:</strong> ${esc(val.color)}</div>
 
-    // Frets affected list
-    const affected = val.fretCondition?.affectedFrets || {};
-    const affectedList = Object.keys(affected).filter(k => affected[k]).map(k => k.replace('fret', '').replace(/^0+/, '')).join(', ') || 'None';
+        <div class="section">
+          <h2>Measurements</h2>
+          <table>
+            <thead>
+              <tr><th>Measurement</th><th>Received</th><th>Outgoing</th></tr>
+            </thead>
+            <tbody>${measurementRows}</tbody>
+          </table>
+        </div>
 
-    const html = `<!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Print Setup - ${esc(val.name)}</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial; color:#222; padding:20px }
-            h1 { font-size:18px; margin-bottom:8px }
-            table { border-collapse: collapse; width:100%; margin-bottom:12px }
-            th, td { text-align:left }
-            .section { margin-bottom: 14px }
-            .meta { margin-bottom: 8px }
-          </style>
-        </head>
-        <body>
-          <h1>McCoy Guitars Setup</h1>
-          <div class="meta"><strong>Name:</strong> ${esc(val.name)} &nbsp;&nbsp; <strong>Phone:</strong> ${esc(val.phone)}</div>
-          <div class="section">
-            <h3>Measurements</h3>
-            <table>
-              <thead><tr><th style="padding:6px;border:1px solid #eee">Measurement</th><th style="padding:6px;border:1px solid #eee">Received</th><th style="padding:6px;border:1px solid #eee">Initial / Completed</th></tr></thead>
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-          </div>
+        <div class="section">
+          <h2>String Height at Saddles</h2>
+          <table>
+            <thead>
+              <tr><th>String</th><th>Received</th><th>Outgoing</th></tr>
+            </thead>
+            <tbody>${stringRows}</tbody>
+          </table>
+        </div>
 
-          <div class="section">
-            <h3>String Height at Saddles</h3>
-            <table>
-              <thead><tr><th style="padding:6px;border:1px solid #eee">String</th><th style="padding:6px;border:1px solid #eee">Received</th><th style="padding:6px;border:1px solid #eee">Initial / Completed</th></tr></thead>
-              <tbody>
-                ${stringRows}
-              </tbody>
-            </table>
-          </div>
+        <div class="section">
+          <h2>Fret Condition</h2>
+          <table>
+            <tr><td>High Frets</td><td>${val.fretCondition?.highFrets ? 'Yes' : 'No'}</td></tr>
+            <tr><td>Affected Frets</td><td>${affectedList}</td></tr>
+            <tr><td>Marks / Notes</td><td>${esc(val.fretCondition?.marksNotes)}</td></tr>
+          </table>
+        </div>
 
-          <div class="section">
-            <h3>Fret Condition</h3>
-            <div><strong>High Frets:</strong> ${val.fretCondition?.highFrets ? 'Yes' : 'No'}</div>
-            <div><strong>Affected Frets:</strong> ${affectedList}</div>
-            <div style="margin-top:8px"><strong>Marks/Notes:</strong><div>${esc(val.fretCondition?.marksNotes)}</div></div>
-          </div>
+        <div class="section">
+          <h2>Notes / Tuning / Details</h2>
+          <div>${esc(val.notes)}</div>
+        </div>
 
-          <div class="section">
-            <h3>Notes / Tuning / Details</h3>
-            <div>${esc(val.notes)}</div>
-          </div>
-        </body>
-      </html>`;
+        <div class="footer">Printed: ${new Date().toLocaleString()}</div>
+      </div>
+    </body>
+  </html>`;
+}
 
-    return html;
-  }
 
   cancel() {
     this.router.navigate(['/']);
