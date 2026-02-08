@@ -57,3 +57,32 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Firebase
+
+This project now includes the Firebase JavaScript SDK. Follow these steps to finish setup and (optionally) enable hosting or other Firebase services:
+
+1. Fill in your Firebase config
+
+	- Open `src/environments/firebase.config.ts` and replace the placeholder values with the real values from your Firebase Console (Project settings → SDK setup).
+
+2. Use the Firebase CLI (optional)
+
+	- We added `firebase-tools` as a dev dependency. You can run it via `npx` or install it globally:
+
+	  - Use without global install: `npx firebase login` / `npx firebase init` / `npx firebase deploy`
+	  - Or install globally: `npm install -g firebase-tools` then `firebase login` etc.
+
+3. Initialize hosting (optional)
+
+	- From the project root run: `npx firebase init` and choose the services you need (Hosting, Firestore, Functions, etc.).
+
+4. Deploy (optional)
+
+	- Build the app for production: `npm run build`
+	- Deploy with the Firebase CLI: `npx firebase deploy` (or `firebase deploy` if installed globally).
+
+Notes
+
+- This repository uses the Firebase JS SDK directly (`firebase`) and initializes it in `src/main.ts`.
+- The Angular-focused integration library (`@angular/fire`) currently had a peer dependency mismatch with Angular 21 at the time of setup, so it wasn't installed automatically. If you want to use `@angular/fire` when a compatible version is available, install it with `npm install @angular/fire` and follow its docs.

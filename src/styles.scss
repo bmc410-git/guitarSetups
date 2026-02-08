@@ -1,1 +1,45 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles and PrimeNG theming */
+
+/* PrimeNG theme, core and icons */
+@import 'primeng/resources/themes/saga-blue/theme.css';
+@import 'primeng/resources/primeng.min.css';
+@import 'primeicons/primeicons.css';
+@import 'primeflex/primeflex.css';
+
+/* Global typography */
+html, body {
+	height: 100%;
+	margin: 0;
+	font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial;
+	background: #fafafa;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+app-root, body > app-root {
+	display: block;
+	min-height: 100vh;
+}
+
+/* Card / shell polish */
+.p-card {
+	border-radius: 12px;
+	box-shadow: 0 6px 20px rgba(16,24,40,0.08);
+}
+
+/* Touch-friendly buttons */
+.p-button {
+	min-width: 44px;
+	min-height: 44px;
+}
+
+.container {
+	padding: 16px;
+}
+
+.app-header {
+	box-shadow: 0 2px 8px rgba(16,24,40,0.06);
+	background: linear-gradient(90deg, #5b3cc4, #8f5fff);
+	color: white;
+}
+
