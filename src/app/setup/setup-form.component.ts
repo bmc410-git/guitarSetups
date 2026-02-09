@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
-import { InputTextareaModule } from 'primeng/inputtextarea';
+import { TextareaModule } from 'primeng/textarea';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -13,7 +13,7 @@ import { FirestoreService } from '../services/firestore.service';
 @Component({
   selector: 'app-setup-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, InputTextModule, InputTextareaModule, ButtonModule, CardModule, CheckboxModule, PanelModule],
+  imports: [CommonModule, ReactiveFormsModule, InputTextModule, TextareaModule, ButtonModule, CardModule, CheckboxModule, PanelModule],
   styleUrls: ['./setup-form.component.scss'],
   template: `
     <p-card>
@@ -143,15 +143,15 @@ import { FirestoreService } from '../services/firestore.service';
 
         <section style="margin-top:12px">
           <h3>Fret & Condition Assessment</h3>
-          <p-checkbox [formControl]="getControl('fretCondition.highFrets')" [binary]="true" label="High Frets"></p-checkbox>
+          <label class="p-checkbox-label"><p-checkbox [formControl]="getControl('fretCondition.highFrets')" [binary]="true"></p-checkbox> <span>High Frets</span></label>
           <div style="margin-top:8px">Affected Frets</div>
           <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px">
             <ng-container *ngFor="let n of frets">
-              <p-checkbox [formControl]="getControl('fretCondition.affectedFrets.fret' + (n<10?('0'+n):n))" [binary]="true" [label]="(n < 10 ? '0' + n : ('' + n))"></p-checkbox>
+              <label class="fret-checkbox"><p-checkbox [formControl]="getControl('fretCondition.affectedFrets.fret' + (n<10?('0'+n):n))" [binary]="true"></p-checkbox><span class="fret-label">{{ (n < 10 ? '0' + n : ('' + n)) }}</span></label>
             </ng-container>
           </div>
           <div style="margin-top:8px">
-            <p-checkbox [formControl]="getControl('fretCondition.noticeableMarks')" [binary]="true" label="Noticeable Marks or Defects"></p-checkbox>
+            <label class="p-checkbox-label"><p-checkbox [formControl]="getControl('fretCondition.noticeableMarks')" [binary]="true"></p-checkbox> <span>Noticeable Marks or Defects</span></label>
           </div>
           <div style="width:100%;margin-top:8px">
             <label>Marks / Defects Notes</label>
